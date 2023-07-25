@@ -4,7 +4,7 @@ Copyright © 2023 o77tsen
 package cmd
 
 import (
-	"encoding/json"
+	// "encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -24,12 +24,22 @@ var getBoardCmd = &cobra.Command{
 	},
 }
 
-type Board struct {
-	Name       string
-	Desc       string
-	LabelNames []string
-	Lists      []string
-	URL        string
+type LabelNames struct {
+	Black  string `json:"black"`
+	Green  string `json:"green"`
+	Orange string `json:"orange"`
+	Pink   string `json:"pink"`
+	Purple string `json:"purple"`
+	Red    string `json:"red"`
+	Sky    string `json:"sky"`
+}
+
+type BoardData struct {
+	Name       string     `json:"name"`
+	Desc       string     `json:"desc"`
+	URL        string     `json:"url"`
+	ShortURL   string     `json:"shortUrl"`
+	LabelNames LabelNames `json:"labelNames"`
 }
 
 func init() {
@@ -53,10 +63,32 @@ func getBoard() {
 		log.Fatal(err)
 	}
 
-	jsonData, err := json.MarshalIndent(board, "", "    ")
-	if err != nil {
-		log.Fatal("Error converting to JSON:", err)
+	boardData := BoardData{
+		Name:       board.Name,
+		Desc:       board.Desc,
+		URL:        board.URL,
+		ShortURL:   board.ShortURL,
+		LabelNames: LabelNames{
+			Black: board.LabelNames.Black,
+			Green: board.LabelNames.Green,
+			Orange: board.LabelNames.Orange,
+			Pink: board.LabelNames.Pink,
+			Purple: board.LabelNames.Purple,
+			Red: board.LabelNames.Red,
+			Sky: board.LabelNames.Sky,
+		},
 	}
 
-	fmt.Println(string(jsonData))
+	printBoardDataFormatted(boardData)
+}
+
+func printBoardDataFormatted(boardData BoardData) {
+	labels := fmt.Sprintf("\n- %s\n- %s\n- %s\n- %s\n- %s\n- %s\n- %s",
+		boardData.LabelNames.Black, boardData.LabelNames.Green, boardData.LabelNames.Orange,
+		boardData.LabelNames.Pink, boardData.LabelNames.Purple, boardData.LabelNames.Red,
+		boardData.LabelNames.Sky,
+	)
+
+	fmt.Printf("Board Data for %s\nDesc: %s\nURL: %s\nShort URL: %s\nLabels: %s\n",
+		boardData.Name, boardData.Desc, boardData.URL, boardData.ShortURL, labels)
 }
