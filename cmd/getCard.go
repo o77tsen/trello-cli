@@ -25,10 +25,11 @@ var getCardCmd = &cobra.Command{
 }
 
 type CardData struct {
-	ID   string `json:"id"`
-	Name string `json:"Name"`
-	Desc string `json:"Desc"`
-	URL  string `json:"url"`
+	ID     string   `json:"id"`
+	Name   string   `json:"Name"`
+	Desc   string   `json:"Desc"`
+	URL    string   `json:"url"`
+	Labels []string `json:"labels"`
 }
 
 func init() {
@@ -61,11 +62,16 @@ func getCard() {
 
 	for _, card := range cards {
 		if !card.Closed {
+			var labels []string
+			for _, label := range card.Labels {
+				labels = append(labels, label.Name)
+			}
 			cardData := CardData{
 				ID:   card.ID,
 				Name: card.Name,
 				Desc: card.Desc,
 				URL:  card.URL,
+				Labels: labels,
 			}
 
 			cardDataList = append(cardDataList, cardData)
