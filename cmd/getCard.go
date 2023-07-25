@@ -1,12 +1,16 @@
 /*
 Copyright © 2023 o77tsen
-
 */
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
+	"os"
 
+	"github.com/adlio/trello"
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 )
 
@@ -14,22 +18,68 @@ import (
 var getCardCmd = &cobra.Command{
 	Use:   "getCard",
 	Short: "Get card data from your trello board",
-	Long: `Get card data from your trello board`,
+	Long:  `Get card data from your trello board`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("getCard called")
+		getCard()
 	},
+}
+
+type CardData struct {
+	ID   string `json:"id"`
+	Name string `json:"Name"`
+	Desc string `json:"Desc"`
+	URL  string `json:"url"`
 }
 
 func init() {
 	rootCmd.AddCommand(getCardCmd)
+}
 
-	// Here you will define your flags and configuration settings.
+func getCard() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading env file:", err)
+	}
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// getCardCmd.PersistentFlags().String("foo", "", "A help for foo")
+	appKey := os.Getenv("TRELLO_KEY")
+	token := os.Getenv("TRELLO_TOKEN")
+	boardId := os.Getenv("TRELLO_BOARD_ID")
 
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// getCardCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	client := trello.NewClient(appKey, token)
+
+	board, err := client.GetBoard(boardId, trello.Defaults())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cards, err := board.GetCards(trello.Defaults())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var cardDataList []CardData
+
+	for _, card := range cards {
+		if !card.Closed {
+			cardData := CardData{
+				ID:   card.ID,
+				Name: card.Name,
+				Desc: card.Desc,
+				URL:  card.URL,
+			}
+
+			cardDataList = append(cardDataList, cardData)
+		}
+	}
+
+	if len(cardDataList) > 1 {
+		cardDataList = cardDataList[1:]
+	}
+
+	jsonData, err := json.MarshalIndent(cardDataList, "", "    ")
+	if err != nil {
+		log.Fatal("Error converting to JSON:", err)
+	}
+
+	fmt.Println(string(jsonData))
 }
