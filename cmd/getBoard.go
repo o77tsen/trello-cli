@@ -61,21 +61,22 @@ func getBoard() {
 	board, err := client.GetBoard(boardId, trello.Defaults())
 	if err != nil {
 		log.Fatal(err)
+		os.Exit(1)
 	}
 
 	boardData := BoardData{
-		Name:       board.Name,
-		Desc:       board.Desc,
-		URL:        board.URL,
-		ShortURL:   board.ShortURL,
+		Name:     board.Name,
+		Desc:     board.Desc,
+		URL:      board.URL,
+		ShortURL: board.ShortURL,
 		LabelNames: LabelNames{
-			Black: board.LabelNames.Black,
-			Green: board.LabelNames.Green,
+			Black:  board.LabelNames.Black,
+			Green:  board.LabelNames.Green,
 			Orange: board.LabelNames.Orange,
-			Pink: board.LabelNames.Pink,
+			Pink:   board.LabelNames.Pink,
 			Purple: board.LabelNames.Purple,
-			Red: board.LabelNames.Red,
-			Sky: board.LabelNames.Sky,
+			Red:    board.LabelNames.Red,
+			Sky:    board.LabelNames.Sky,
 		},
 	}
 

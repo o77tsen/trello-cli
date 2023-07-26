@@ -4,27 +4,27 @@ Copyright © 2023 o77tsen
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 
 	"github.com/adlio/trello"
 	"github.com/joho/godotenv"
+	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 )
 
 // getCardCmd represents the getCard command
 var getCardCmd = &cobra.Command{
 	Use:   "getCard",
-	Short: "Get card data from your trello board",
-	Long:  `Get card data from your trello board`,
+	Short: "Get a card data from your trello",
+	Long:  `Get a card data from your trello`,
 	Run: func(cmd *cobra.Command, args []string) {
 		getCard()
 	},
 }
 
-type CardData struct {
+type SingleCardData struct {
 	ID     string   `json:"id"`
 	Name   string   `json:"Name"`
 	Desc   string   `json:"Desc"`
@@ -40,6 +40,7 @@ func getCard() {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading env file:", err)
+		os.Exit(1)
 	}
 
 	appKey := os.Getenv("TRELLO_KEY")
@@ -49,16 +50,14 @@ func getCard() {
 	client := trello.NewClient(appKey, token)
 
 	board, err := client.GetBoard(boardId, trello.Defaults())
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	cards, err := board.GetCards(trello.Defaults())
 	if err != nil {
 		log.Fatal(err)
+		os.Exit(1)
 	}
 
-	var cardDataList []CardData
+	var cardDataList []SingleCardData
 
 	for _, card := range cards {
 		if !card.Closed {
@@ -66,26 +65,51 @@ func getCard() {
 			for _, label := range card.Labels {
 				labels = append(labels, label.Name)
 			}
-			cardData := CardData{
-				ID:   card.ID,
-				Name: card.Name,
-				Desc: card.Desc,
-				URL:  card.URL,
+
+			singleCardData := SingleCardData{
+				ID:     card.ID,
+				Name:   card.Name,
+				Desc:   card.Desc,
+				URL:    card.URL,
 				Labels: labels,
 			}
 
-			cardDataList = append(cardDataList, cardData)
+			cardDataList = append(cardDataList, singleCardData)
 		}
 	}
 
-	if len(cardDataList) > 1 {
-		cardDataList = cardDataList[1:]
-	}
-
-	jsonData, err := json.MarshalIndent(cardDataList, "", "    ")
+	selectedCardIdx, _, err := promptSelectCard(cardDataList)
 	if err != nil {
-		log.Fatal("Error converting to JSON:", err)
+		log.Fatal(err)
+		os.Exit(1)
 	}
 
-	fmt.Println(string(jsonData))
+	displayCardData(cardDataList[selectedCardIdx])
+}
+
+func promptSelectCard(cards []SingleCardData) (int, string, error) {
+	templates := &promptui.SelectTemplates{
+		Label:    "{{ . }}",
+		Active:   "🚀 {{ .Name | cyan }}",
+		Inactive: " {{ .Name | cyan }}",
+		Selected: "You are viewing: {{ .Name | cyan }}",
+	}
+
+	prompt := promptui.Select{
+		Label:     "Select a card to view",
+		Items:     cards,
+		Templates: templates,
+		Size:      10,
+	}
+
+	idx, _, err := prompt.Run()
+	if err != nil {
+		return -1, "", err
+	}
+
+	return idx, cards[idx].ID, nil
+}
+
+func displayCardData(singleCardData SingleCardData) {
+	fmt.Printf("Card ID: %s\nName: %s\nDesc: %s\nURL: %s\nLabels: %v\n", singleCardData.ID, singleCardData.Name, singleCardData.Desc, singleCardData.URL, singleCardData.Labels)
 }
