@@ -119,14 +119,14 @@ func promptSelect(cards []GetCard) (int, string, error) {
 
 func promptConfirm(msg string) bool {
 	confirmPrompt := promptui.Select{
-		Label:         msg,
+		Label: msg,
 		Items: []string{"Yes", "No"},
 	}
 
 	_, result, err := confirmPrompt.Run()
 	if err != nil || result == "No" {
 		return false
-	} 
+	}
 
 	return true
 }

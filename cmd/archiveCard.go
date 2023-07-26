@@ -1,6 +1,5 @@
 /*
 Copyright © 2023 o77tsen
-
 */
 package cmd
 
@@ -19,7 +18,7 @@ import (
 var archiveCardCmd = &cobra.Command{
 	Use:   "archiveCard",
 	Short: "Archive a card from your trello",
-	Long: `Archive a card from your trello`,
+	Long:  `Archive a card from your trello`,
 	Run: func(cmd *cobra.Command, args []string) {
 		archiveCard()
 	},
@@ -60,7 +59,7 @@ func archiveCard() {
 	for _, card := range cards {
 		if !card.Closed {
 			getCard := CardToArchive{
-				ID: card.ID,
+				ID:   card.ID,
 				Name: card.Name,
 			}
 
