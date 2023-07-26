@@ -25,6 +25,11 @@ var createCardCmd = &cobra.Command{
 	},
 }
 
+type GetListData struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 func init() {
 	rootCmd.AddCommand(createCardCmd)
 }
@@ -54,54 +59,67 @@ func createCard() {
 		os.Exit(1)
 	}
 
-	listNames := make([]string, len(lists))
-	for i, list := range lists {
-		listNames[i] = list.Name
+	var getListData []GetListData
+	for _, list := range lists {
+		listData := GetListData{
+			ID:   list.ID,
+			Name: list.Name,
+		}
+
+		getListData = append(getListData, listData)
 	}
 
-	promptList := promptui.Select{
-		Label: "Select the list to create a card",
-		Items: listNames,
-	}
-
-	idx, _, err := promptList.Run()
+	selectedListIdx, _, err := promptSelectList(getListData)
 	if err != nil {
 		log.Fatal(err)
 		os.Exit(1)
 	}
 
-	selectedList := lists[idx]
+	selectedList := lists[selectedListIdx]
 
+	newCard, err := createCardObj(board, selectedList)
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
+
+	err = client.CreateCard(newCard, trello.Defaults())
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Success: created card %s in list %s\n", newCard.Name, selectedList.Name)
+}
+
+func createCardObj(board *trello.Board, selectedList *trello.List) (*trello.Card, error) {
 	promptCardName := promptui.Prompt{
-		Label: "Provide a name for this card",
+		Label: "Provide a name for this card ",
 	}
 
 	cardName, err := promptCardName.Run()
 	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
+		return nil, err
 	}
 
 	promptCardDesc := promptui.Prompt{
-		Label: "Provide a descripion for this card ",
+		Label: "Provide a description for this card",
 	}
 
 	cardDesc, err := promptCardDesc.Run()
 	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
+		return nil, err
 	}
 
 	cardDesc = strings.ReplaceAll(cardDesc, "\\n", "\n")
 
 	promptCardLabels := promptui.Prompt{
-		Label: "Provide card labels for this card (Separate them with commas) ",
+		Label: "Provide labels for this card [Separate with commas]",
 	}
 
 	cardLabelsInput, err := promptCardLabels.Run()
 	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
+		return nil, err
 	}
 
 	cardLabels := []string{}
@@ -118,8 +136,7 @@ func createCard() {
 
 	cardsInList, err := selectedList.GetCards(trello.Defaults())
 	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
+		return nil, err
 	}
 
 	var pos float64
@@ -137,13 +154,7 @@ func createCard() {
 		IDLabels: cardLabels,
 	}
 
-	err = client.CreateCard(newCard, trello.Defaults())
-	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("Success: created card %s in list %s\n", cardName, selectedList.Name)
+	return newCard, nil
 }
 
 func getLabelID(board *trello.Board, labelName string) string {
@@ -160,4 +171,27 @@ func getLabelID(board *trello.Board, labelName string) string {
 	}
 
 	return ""
+}
+
+func promptSelectList(lists []GetListData) (int, string, error) {
+	templates := &promptui.SelectTemplates{
+		Label:    "{{ . }}",
+		Active:   "🚀 {{ .Name | cyan }}",
+		Inactive: " {{ .Name | cyan }}",
+		Selected: "You are viewing: {{ .Name | cyan }}",
+	}
+
+	prompt := promptui.Select{
+		Label:     "Select the list to create a card",
+		Items:     lists,
+		Templates: templates,
+		Size:      10,
+	}
+
+	idx, _, err := prompt.Run()
+	if err != nil {
+		return -1, "", err
+	}
+
+	return idx, lists[idx].ID, nil
 }

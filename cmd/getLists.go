@@ -4,13 +4,13 @@ Copyright © 2023 o77tsen
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 
 	"github.com/adlio/trello"
-	"github.com/joho/godotenv"
+	"github.com/manifoldco/promptui"
+	"github.com/o77tsen/trello-cli/client"
 	"github.com/spf13/cobra"
 )
 
@@ -29,17 +29,9 @@ func init() {
 }
 
 func getLists() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading env file:", err)
-		os.Exit(1)
-	}
-
-	appKey := os.Getenv("TRELLO_KEY")
-	token := os.Getenv("TRELLO_TOKEN")
+	client := trelloClient.NewTrelloClient()
+	
 	boardId := os.Getenv("TRELLO_BOARD_ID")
-
-	client := trello.NewClient(appKey, token)
 
 	board, err := client.GetBoard(boardId, trello.Defaults())
 	if err != nil {
@@ -53,11 +45,9 @@ func getLists() {
 		os.Exit(1)
 	}
 
-	jsonData, err := json.MarshalIndent(lists, "", "    ")
-	if err != nil {
-		log.Fatal("Error converting to JSON:", err)
-		os.Exit(1)
-	}
+	cyan := promptui.Styler(promptui.FGCyan)
 
-	fmt.Println(string(jsonData))
+	for _, list := range lists {
+		fmt.Printf("%s %s\n", cyan("-"), list.Name)
+	}
 }

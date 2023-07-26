@@ -1,4 +1,4 @@
-module trello
+module "github.com/o77tsen/trello-cli"
 
 go 1.19
 
