@@ -1,6 +1,5 @@
 /*
 Copyright © 2023 o77tsen
-
 */
 package cmd
 
@@ -19,15 +18,15 @@ import (
 var deleteCardCmd = &cobra.Command{
 	Use:   "deleteCard",
 	Short: "Delete a card from your trello",
-	Long: `Delete a card from your trello`,
+	Long:  `Delete a card from your trello`,
 	Run: func(cmd *cobra.Command, args []string) {
 		delCard()
 	},
 }
 
 type GetCard struct {
-	ID     string   `json:"id"`
-	Name   string   `json:"Name"`
+	ID   string `json:"id"`
+	Name string `json:"Name"`
 }
 
 func init() {
@@ -60,7 +59,7 @@ func delCard() {
 	for _, card := range cards {
 		if !card.Closed {
 			getCard := GetCard{
-				ID: card.ID,
+				ID:   card.ID,
 				Name: card.Name,
 			}
 
@@ -77,6 +76,13 @@ func delCard() {
 	if err != nil {
 		log.Fatal(err)
 		os.Exit(1)
+	}
+
+	fmt.Printf("Are you sure you want to delete %s?", cardDataList[selectedCardIdx].Name)
+
+	if !promptConfirm("Confirm deletion") {
+		fmt.Println("Cancelled card deletion.")
+		return
 	}
 
 	err = deleteCard(client, cardID)
@@ -97,10 +103,10 @@ func promptSelect(cards []GetCard) (int, string, error) {
 	}
 
 	prompt := promptui.Select{
-		Label: "Select a card to delete",
-		Items: cards,
+		Label:     "Select a card to delete",
+		Items:     cards,
 		Templates: templates,
-		Size: 10,
+		Size:      10,
 	}
 
 	idx, _, err := prompt.Run()
@@ -109,6 +115,20 @@ func promptSelect(cards []GetCard) (int, string, error) {
 	}
 
 	return idx, cards[idx].ID, nil
+}
+
+func promptConfirm(msg string) bool {
+	confirmPrompt := promptui.Select{
+		Label:         msg,
+		Items: []string{"Yes", "No"},
+	}
+
+	_, result, err := confirmPrompt.Run()
+	if err != nil || result == "No" {
+		return false
+	} 
+
+	return true
 }
 
 func deleteCard(client *trello.Client, cardID string) error {
