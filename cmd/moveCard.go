@@ -120,7 +120,7 @@ func promptSelectMoveCard(cards []MovedCardData) (int, string, error) {
 		Label:     "Select a card to move",
 		Items:     cards,
 		Templates: templates,
-		Size:      10,
+		Size:      6,
 	}
 
 	idx, _, err := prompt.Run()
@@ -143,7 +143,7 @@ func promptSelectMoveList(lists []MovedCardData) (int, string, error) {
 		Label:     "Select a list to move the card to",
 		Items:     lists,
 		Templates: templates,
-		Size:      10,
+		Size:      6,
 	}
 
 	idx, _, err := prompt.Run()

@@ -17,8 +17,8 @@ import (
 // archiveCardCmd represents the archiveCard command
 var archiveCardCmd = &cobra.Command{
 	Use:   "archiveCard",
-	Short: "Archive a card from your trello",
-	Long:  `Archive a card from your trello`,
+	Short: "Archive a card from your trello board",
+	Long:  `Archive a card from your trello board`,
 	Run: func(cmd *cobra.Command, args []string) {
 		archiveCard()
 	},
@@ -91,7 +91,7 @@ func promptSelectArchive(cards []CardToArchive) (int, string, error) {
 		Label:     "Select a card to archive",
 		Items:     cards,
 		Templates: templates,
-		Size:      10,
+		Size:      6,
 	}
 
 	idx, _, err := prompt.Run()

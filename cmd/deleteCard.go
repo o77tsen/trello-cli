@@ -17,8 +17,8 @@ import (
 // deleteCardCmd represents the deleteCard command
 var deleteCardCmd = &cobra.Command{
 	Use:   "deleteCard",
-	Short: "Delete a card from your trello",
-	Long:  `Delete a card from your trello`,
+	Short: "Delete a card from your trello board",
+	Long:  `Delete a card from your trello board`,
 	Run: func(cmd *cobra.Command, args []string) {
 		delCard()
 	},
@@ -98,7 +98,7 @@ func promptSelect(cards []GetCard) (int, string, error) {
 		Label:     "Select a card to delete",
 		Items:     cards,
 		Templates: templates,
-		Size:      10,
+		Size:      6,
 	}
 
 	idx, _, err := prompt.Run()
@@ -112,11 +112,11 @@ func promptSelect(cards []GetCard) (int, string, error) {
 func promptConfirm(msg string) bool {
 	confirmPrompt := promptui.Select{
 		Label: msg,
-		Items: []string{"Yes", "No"},
+		Items: []string{"Confirm", "Cancel"},
 	}
 
 	_, result, err := confirmPrompt.Run()
-	if err != nil || result == "No" {
+	if err != nil || result == "Cancel" {
 		return false
 	}
 

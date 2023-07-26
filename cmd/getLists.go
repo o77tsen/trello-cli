@@ -17,8 +17,8 @@ import (
 // getListsCmd represents the getLists command
 var getListsCmd = &cobra.Command{
 	Use:   "getLists",
-	Short: "Get lists data from your trello board",
-	Long:  `Get lists data from your trello board`,
+	Short: "Get all lists from your trello board",
+	Long:  `Get all lists from your trello board`,
 	Run: func(cmd *cobra.Command, args []string) {
 		getLists()
 	},

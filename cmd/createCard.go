@@ -18,8 +18,8 @@ import (
 // createCardCmd represents the createCard command
 var createCardCmd = &cobra.Command{
 	Use:   "createCard",
-	Short: "Create a card from your trello",
-	Long:  `Create a card from your trello`,
+	Short: "Create a new card in a specific list on your trello board",
+	Long:  `Create a new card in a specific list on your trello board`,
 	Run: func(cmd *cobra.Command, args []string) {
 		createCard()
 	},
@@ -114,7 +114,7 @@ func createCardObj(board *trello.Board, selectedList *trello.List) (*trello.Card
 	cardDesc = strings.ReplaceAll(cardDesc, "\\n", "\n")
 
 	promptCardLabels := promptui.Prompt{
-		Label: "Provide labels for this card [Separate with commas]",
+		Label: "Provide labels for this card (Separate with commas)",
 	}
 
 	cardLabelsInput, err := promptCardLabels.Run()
@@ -182,10 +182,10 @@ func promptSelectList(lists []GetListData) (int, string, error) {
 	}
 
 	prompt := promptui.Select{
-		Label:     "Select the list to create a card",
+		Label:     "Select a list to create the card in",
 		Items:     lists,
 		Templates: templates,
-		Size:      10,
+		Size:      6,
 	}
 
 	idx, _, err := prompt.Run()

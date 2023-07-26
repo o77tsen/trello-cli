@@ -17,8 +17,8 @@ import (
 // getCardCmd represents the getCard command
 var getCardCmd = &cobra.Command{
 	Use:   "getCard",
-	Short: "Get a card data from your trello",
-	Long:  `Get a card data from your trello`,
+	Short: "Select a card to view its data (name, desc, URL, labels)",
+	Long:  `Select a card to view its data (name, desc, URL, labels)`,
 	Run: func(cmd *cobra.Command, args []string) {
 		getCard()
 	},
@@ -91,7 +91,7 @@ func promptSelectCard(cards []SingleCardData) (int, string, error) {
 		Label:     "Select a card to view",
 		Items:     cards,
 		Templates: templates,
-		Size:      10,
+		Size:      6,
 	}
 
 	idx, _, err := prompt.Run()
@@ -103,5 +103,7 @@ func promptSelectCard(cards []SingleCardData) (int, string, error) {
 }
 
 func displayCardData(singleCardData SingleCardData) {
-	fmt.Printf("Card ID: %s\nName: %s\nDesc: %s\nURL: %s\nLabels: %v\n", singleCardData.ID, singleCardData.Name, singleCardData.Desc, singleCardData.URL, singleCardData.Labels)
+	cyan := promptui.Styler(promptui.FGCyan)
+
+	fmt.Printf("%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %v\n", cyan("ID"), singleCardData.ID, cyan("Name"), singleCardData.Name, cyan("Desc"), singleCardData.Desc, cyan("URL"), singleCardData.URL, cyan("Labels"), singleCardData.Labels)
 }
