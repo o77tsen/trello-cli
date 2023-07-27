@@ -11,7 +11,7 @@ import (
 
 	"github.com/adlio/trello"
 	"github.com/manifoldco/promptui"
-	trelloClient "github.com/o77tsen/trello-cli/client"
+	"github.com/o77tsen/trello-cli/client"
 	"github.com/spf13/cobra"
 )
 
