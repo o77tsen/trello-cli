@@ -6,7 +6,6 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/adlio/trello"
 	"github.com/manifoldco/promptui"
@@ -20,95 +19,128 @@ var moveCardCmd = &cobra.Command{
 	Short: "Move a card to another list from your trello",
 	Long:  `Create a card to another list from your trello`,
 	Run: func(cmd *cobra.Command, args []string) {
-		moveCard()
+		name, _ := rootCmd.Flags().GetString("name")
+		list, _ := rootCmd.Flags().GetString("list")
+		moveCard(name, list)
 	},
-}
-
-type MovedCardData struct {
-	ID   string `json:"id"`
-	Name string `json:"Name"`
 }
 
 func init() {
 	rootCmd.AddCommand(moveCardCmd)
 }
 
-func moveCard() {
-	client := trelloClient.NewTrelloClient()
+type CardToMove struct {
+	ID   string `json:"id"`
+	Name string `json:"Name"`
+}
 
-	boardId := os.Getenv("TRELLO_BOARD_ID")
-
-	board, err := client.GetBoard(boardId, trello.Defaults())
+func moveCard(name string, list string) {
+	board, err := trelloInstance.GetBoard(trelloClient.GetBoardID())
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
 	cards, err := board.GetCards(trello.Defaults())
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
 	lists, err := board.GetLists(trello.Defaults())
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
-	var cardDataList []MovedCardData
+	cardMoveDataList := filterMoveCards(cards)
+	if len(cardMoveDataList) == 0 {
+		fmt.Println("There are no cards to move.")
+		return
+	}
+
+	if name != "" {
+		moveCardByName(name, list, lists, cardMoveDataList)
+	} else {
+		moveCardBySelect(cardMoveDataList, lists)
+	}
+}
+
+func filterMoveCards(cards []*trello.Card) []CardToMove {
+	var cardDataList []CardToMove
 
 	for _, card := range cards {
 		if !card.Closed {
-			movedCardData := MovedCardData{
+			cardToMove := CardToMove{
 				ID:   card.ID,
 				Name: card.Name,
 			}
 
-			cardDataList = append(cardDataList, movedCardData)
+			cardDataList = append(cardDataList, cardToMove)
 		}
 	}
 
-	var listDataList []MovedCardData
-	for _, list := range lists {
-		listData := MovedCardData{
-			ID:   list.ID,
-			Name: list.Name,
-		}
-
-		listDataList = append(listDataList, listData)
-	}
-
-	selectedCardIdx, cardID, err := promptSelectMoveCard(cardDataList)
-	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
-	}
-
-	selectedCard, err := client.GetCard(cardID, trello.Defaults())
-	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
-	}
-
-	selectedListIdx, _, err := promptSelectMoveList(listDataList)
-	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
-	}
-
-	selectedList := lists[selectedListIdx]
-
-	err = selectedCard.MoveToList(selectedList.ID, trello.Defaults())
-	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("Success: moved card %s to list %s\n", cardDataList[selectedCardIdx].Name, selectedList.Name)
+	return cardDataList
 }
 
-func promptSelectMoveCard(cards []MovedCardData) (int, string, error) {
+func findListByInput(name string, lists []*trello.List) *trello.List {
+	for _, listData := range lists {
+		if listData.Name == name {
+			return listData
+		}
+	}
+
+	return nil
+}
+
+func findCardByName(name string, cards []CardToMove) *CardToMove {
+	for _, cardData := range cards {
+		if cardData.Name == name {
+			return &cardData
+		}
+	}
+
+	return nil
+}
+
+func moveCardByName(name string, list string, lists []*trello.List, cards []CardToMove) {
+	selectedList := findListByInput(list, lists)
+	if selectedList == nil {
+		fmt.Printf("List `%s` could not be found.\n", list)
+		return
+	}
+
+	selectedCard := findCardByName(name, cards)
+	if selectedCard == nil {
+		fmt.Printf("Card name `%s` could not be found.\n", name)
+		return
+	}
+
+	err := moveSingleCard(trelloInstance, selectedList.ID, selectedCard.ID)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("Success: moved card `%s` to `%s`\n", selectedCard.Name, selectedList.Name)
+}
+
+func moveCardBySelect(cards []CardToMove, lists []*trello.List) {
+	selectedCardId, cardID, err := promptSelectMoveCard(cards)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	selectedListId, _, err := promptSelectMoveList(lists)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = moveSingleCard(trelloInstance, lists[selectedListId].ID, cardID)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("Success: moved card `%s` to `%s`\n", cards[selectedCardId].Name, lists[selectedListId].Name)
+}
+
+func promptSelectMoveCard(cards []CardToMove) (int, string, error) {
 	templates := &promptui.SelectTemplates{
 		Label:    "{{ . }}",
 		Active:   "🚀 {{ .Name | cyan }}",
@@ -131,7 +163,7 @@ func promptSelectMoveCard(cards []MovedCardData) (int, string, error) {
 	return idx, cards[idx].ID, nil
 }
 
-func promptSelectMoveList(lists []MovedCardData) (int, string, error) {
+func promptSelectMoveList(lists []*trello.List) (int, string, error) {
 	templates := &promptui.SelectTemplates{
 		Label:    "{{ . }}",
 		Active:   "🚀 {{ .Name | cyan }}",
@@ -152,4 +184,17 @@ func promptSelectMoveList(lists []MovedCardData) (int, string, error) {
 	}
 
 	return idx, lists[idx].ID, nil
+}
+
+func moveSingleCard(client *trello.Client, listID string, cardID string) error {
+	card, err := client.GetCard(cardID, trello.Defaults())
+	if err != nil {
+		return err
+	}
+
+	args := trello.Arguments{
+		"idList": listID,
+	}
+
+	return card.Update(args)
 }

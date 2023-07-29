@@ -6,7 +6,6 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/adlio/trello"
 	"github.com/manifoldco/promptui"
@@ -29,20 +28,14 @@ func init() {
 }
 
 func getLists() {
-	client := trelloClient.NewTrelloClient()
-	
-	boardId := os.Getenv("TRELLO_BOARD_ID")
-
-	board, err := client.GetBoard(boardId, trello.Defaults())
+	board, err := trelloInstance.GetBoard(trelloClient.GetBoardID())
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
 	lists, err := board.GetLists(trello.Defaults())
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
 	cyan := promptui.Styler(promptui.FGCyan)

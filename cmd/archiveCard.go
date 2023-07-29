@@ -6,7 +6,6 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/adlio/trello"
 	"github.com/manifoldco/promptui"
@@ -14,14 +13,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// archiveCardCmd represents the archiveCard command
 var archiveCardCmd = &cobra.Command{
 	Use:   "archiveCard",
 	Short: "Archive a card from your trello board",
 	Long:  `Archive a card from your trello board`,
 	Run: func(cmd *cobra.Command, args []string) {
-		archiveCard()
+		name, _ := rootCmd.Flags().GetString("name")
+		archiveCard(name)
 	},
+}
+
+func init() {
+	rootCmd.AddCommand(archiveCardCmd)
 }
 
 type CardToArchive struct {
@@ -29,54 +32,82 @@ type CardToArchive struct {
 	Name string `json:"Name"`
 }
 
-func init() {
-	rootCmd.AddCommand(archiveCardCmd)
-}
-
-func archiveCard() {
-	client := trelloClient.NewTrelloClient()
-
-	boardId := os.Getenv("TRELLO_BOARD_ID")
-
-	board, err := client.GetBoard(boardId, trello.Defaults())
+func archiveCard(name string) {
+	board, err := trelloInstance.GetBoard(trelloClient.GetBoardID())
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	cards, err := board.GetCards(trello.Defaults())
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
+	cardArchiveDataList := filterArchiveCards(cards)
+	if len(cardArchiveDataList) == 0 {
+		fmt.Println("There are no cards to archive.")
+		return
+	}
+
+	if name != "" {
+		archiveCardByName(name, cards)
+	} else {
+		archiveCardBySelect(cardArchiveDataList)
+	}
+}
+
+func filterArchiveCards(cards []*trello.Card) []CardToArchive {
 	var cardDataList []CardToArchive
 
 	for _, card := range cards {
 		if !card.Closed {
-			getCard := CardToArchive{
+			cardToArchive := CardToArchive{
 				ID:   card.ID,
 				Name: card.Name,
 			}
 
-			cardDataList = append(cardDataList, getCard)
+			cardDataList = append(cardDataList, cardToArchive)
 		}
 	}
 
-	if len(cardDataList) == 0 {
-		fmt.Println("There are no cards to archive.")
-		os.Exit(1)
+	return cardDataList
+}
+
+func archiveCardByName(name string, cards []*trello.Card) {
+	var selectedCard *trello.Card
+
+	for _, cardData := range cards {
+		if cardData.Name == name {
+			selectedCard = cardData
+			break
+		}
 	}
 
-	selectedCardIdx, cardID, err := promptSelectArchive(cardDataList)
+	if selectedCard == nil {
+		fmt.Printf("Card name `%s` could not be found.\n", name)
+		return
+	}
+
+	err := archiveSingleCard(trelloInstance, selectedCard.ID)
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
-	err = archiveSingleCard(client, cardID)
+	fmt.Printf("Success: archived card `%s`\n", selectedCard.Name)
+}
+
+func archiveCardBySelect(cards []CardToArchive) {
+	selectedCardId, cardID, err := promptSelectArchive(cards)
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
-	fmt.Printf("Success: archived card %s", cardDataList[selectedCardIdx].Name)
+	err = archiveSingleCard(trelloInstance, cardID)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("Success: archived card `%s`\n", cards[selectedCardId].Name)
 }
 
 func promptSelectArchive(cards []CardToArchive) (int, string, error) {

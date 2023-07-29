@@ -6,7 +6,6 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/adlio/trello"
 	"github.com/manifoldco/promptui"
@@ -20,11 +19,16 @@ var getCardCmd = &cobra.Command{
 	Short: "Select a card to view its data (name, desc, URL, labels)",
 	Long:  `Select a card to view its data (name, desc, URL, labels)`,
 	Run: func(cmd *cobra.Command, args []string) {
-		getCard()
+		name, _ := rootCmd.Flags().GetString("name")
+		getCard(name)
 	},
 }
 
-type SingleCardData struct {
+func init() {
+	rootCmd.AddCommand(getCardCmd)
+}
+
+type CardToGet struct {
 	ID     string   `json:"id"`
 	Name   string   `json:"Name"`
 	Desc   string   `json:"Desc"`
@@ -32,54 +36,90 @@ type SingleCardData struct {
 	Labels []string `json:"labels"`
 }
 
-func init() {
-	rootCmd.AddCommand(getCardCmd)
-}
-
-func getCard() {
-	client := trelloClient.NewTrelloClient()
-
-	boardId := os.Getenv("TRELLO_BOARD_ID")
-
-	board, err := client.GetBoard(boardId, trello.Defaults())
+func getCard(name string) {
+	board, err := trelloInstance.GetBoard(trelloClient.GetBoardID())
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	cards, err := board.GetCards(trello.Defaults())
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
-	var cardDataList []SingleCardData
+	cardGetDataList := filterGetCards(cards)
+	if len(cardGetDataList) == 0 {
+		fmt.Println("There are no cards to view.")
+		return
+	}
+
+	if name != "" {
+		getCardByName(name, cards)
+	} else {
+		getCardBySelect(cardGetDataList)
+	}
+}
+
+func filterGetCards(cards []*trello.Card) []CardToGet {
+	var cardDataList []CardToGet
 
 	for _, card := range cards {
 		if !card.Closed {
-			var labels []string
-			for _, label := range card.Labels {
-				labels = append(labels, label.Name)
+			cardToGet := CardToGet{
+				ID:   card.ID,
+				Name: card.Name,
 			}
 
-			singleCardData := SingleCardData{
-				ID:     card.ID,
-				Name:   card.Name,
-				Desc:   card.Desc,
-				URL:    card.URL,
-				Labels: labels,
-			}
-
-			cardDataList = append(cardDataList, singleCardData)
+			cardDataList = append(cardDataList, cardToGet)
 		}
 	}
 
-	selectedCardIdx, _, err := promptSelectCard(cardDataList)
-	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
-	}
-
-	displayCardData(cardDataList[selectedCardIdx])
+	return cardDataList
 }
 
-func promptSelectCard(cards []SingleCardData) (int, string, error) {
+func getCardByName(name string, cards []*trello.Card) {
+	var selectedCard *trello.Card
+	var labels []string
+
+	for _, card := range cards {
+		for _, label := range card.Labels {
+			labels = append(labels, label.Name)
+		}
+
+		if card.Name == name {
+			selectedCard = card
+			break
+		}
+	}
+
+	if selectedCard == nil {
+		fmt.Printf("Card name `%s` could not be found.\n", name)
+		return
+	}
+
+	cardData := CardToGet{
+		ID:   selectedCard.ID,
+		Name: selectedCard.Name,
+		Desc: selectedCard.Desc,
+		URL:  selectedCard.URL,
+		Labels: labels,
+	}
+
+	displayCardData(&cardData)
+}
+
+func getCardBySelect(cards []CardToGet) {
+	selectedCardId, _, err := promptSelectGet(cards)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	selectedCard := &cards[selectedCardId]
+
+	displayCardData(selectedCard)
+}
+
+func promptSelectGet(cards []CardToGet) (int, string, error) {
 	templates := &promptui.SelectTemplates{
 		Label:    "{{ . }}",
 		Active:   "🚀 {{ .Name | cyan }}",
@@ -102,8 +142,8 @@ func promptSelectCard(cards []SingleCardData) (int, string, error) {
 	return idx, cards[idx].ID, nil
 }
 
-func displayCardData(singleCardData SingleCardData) {
+func displayCardData(card *CardToGet) {
 	cyan := promptui.Styler(promptui.FGCyan)
 
-	fmt.Printf("%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %v\n", cyan("ID"), singleCardData.ID, cyan("Name"), singleCardData.Name, cyan("Desc"), singleCardData.Desc, cyan("URL"), singleCardData.URL, cyan("Labels"), singleCardData.Labels)
+	fmt.Printf("%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %v\n", cyan("ID"), card.ID, cyan("Name"), card.Name, cyan("Desc"), card.Desc, cyan("URL"), card.URL, cyan("Labels"), card.Labels)
 }

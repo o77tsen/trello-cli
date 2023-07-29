@@ -6,7 +6,6 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/adlio/trello"
 	"github.com/manifoldco/promptui"
@@ -20,73 +19,106 @@ var deleteCardCmd = &cobra.Command{
 	Short: "Delete a card from your trello board",
 	Long:  `Delete a card from your trello board`,
 	Run: func(cmd *cobra.Command, args []string) {
-		delCard()
+		name, _ := rootCmd.Flags().GetString("name")
+		deleteCard(name)
 	},
-}
-
-type GetCard struct {
-	ID   string `json:"id"`
-	Name string `json:"Name"`
 }
 
 func init() {
 	rootCmd.AddCommand(deleteCardCmd)
 }
 
-func delCard() {
-	client := trelloClient.NewTrelloClient()
+type CardToDelete struct {
+	ID   string `json:"id"`
+	Name string `json:"Name"`
+}
 
-	boardId := os.Getenv("TRELLO_BOARD_ID")
-	
-	board, err := client.GetBoard(boardId, trello.Defaults())
+func deleteCard(name string) {
+	board, err := trelloInstance.GetBoard(trelloClient.GetBoardID())
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	cards, err := board.GetCards(trello.Defaults())
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
-	var cardDataList []GetCard
+	cardDeleteDataList := filterDeleteCards(cards)
+	if len(cardDeleteDataList) == 0 {
+		fmt.Println("There are no cards to delete.")
+		return
+	}
+
+	if name != "" {
+		deleteCardByName(name, cards)
+	} else {
+		deleteCardBySelect(cardDeleteDataList)
+	}
+}
+
+func filterDeleteCards(cards []*trello.Card) []CardToDelete {
+	var cardDataList []CardToDelete
 
 	for _, card := range cards {
 		if !card.Closed {
-			getCard := GetCard{
+			cardToDelete := CardToDelete{
 				ID:   card.ID,
 				Name: card.Name,
 			}
 
-			cardDataList = append(cardDataList, getCard)
+			cardDataList = append(cardDataList, cardToDelete)
 		}
 	}
 
-	if len(cardDataList) == 0 {
-		fmt.Println("There are no cards to delete.")
-		os.Exit(1)
+	return cardDataList
+}
+
+func deleteCardByName(name string, cards []*trello.Card) {
+	var selectedCard *trello.Card
+
+	for _, cardData := range cards {
+		if cardData.Name == name {
+			selectedCard = cardData
+			break
+		}
 	}
 
-	selectedCardIdx, cardID, err := promptSelect(cardDataList)
+	if selectedCard == nil {
+		fmt.Printf("Card name `%s` could not be found.\n", name)
+		return
+	}
+
+	err := deleteSingleCard(trelloInstance, selectedCard.ID)
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
-	fmt.Printf("Are you sure you want to delete %s?", cardDataList[selectedCardIdx].Name)
+	fmt.Printf("Success: deleted card `%s`\n", selectedCard.Name)
+}
 
+func deleteCardBySelect(cards []CardToDelete) {
+	selectedCardId, cardID, err := promptSelectDelete(cards)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("Are you sure you want to delete `%s`?\n", cards[selectedCardId].Name)
+	
 	if !promptConfirm("Confirm deletion") {
 		fmt.Println("Cancelled card deletion.")
 		return
 	}
 
-	err = deleteCard(client, cardID)
+	err = deleteSingleCard(trelloInstance, cardID)
+	// err = deleteSingleCard(trelloInstance, cardID)
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
-	fmt.Printf("Success: deleted card %s", cardDataList[selectedCardIdx].Name)
+	fmt.Printf("Success: deleted card `%s`\n", cards[selectedCardId].Name)
 }
-
-func promptSelect(cards []GetCard) (int, string, error) {
+func promptSelectDelete(cards []CardToDelete) (int, string, error) {
 	templates := &promptui.SelectTemplates{
 		Label:    "{{ . }}",
 		Active:   "🚀 {{ .Name | cyan }}",
@@ -123,7 +155,7 @@ func promptConfirm(msg string) bool {
 	return true
 }
 
-func deleteCard(client *trello.Client, cardID string) error {
+func deleteSingleCard(client *trello.Client, cardID string) error {
 	card, err := client.GetCard(cardID, trello.Defaults())
 	if err != nil {
 		return err

@@ -6,7 +6,6 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"os"
 	"strings"
 
 	"github.com/adlio/trello"
@@ -21,9 +20,14 @@ var createCardCmd = &cobra.Command{
 	Short: "Create a new card in a specific list on your trello board",
 	Long:  `Create a new card in a specific list on your trello board`,
 	Run: func(cmd *cobra.Command, args []string) {
-		createCard()
+		name, _ := rootCmd.Flags().GetString("name")
+		list, _ := rootCmd.Flags().GetString("list")
+		createCard(name, list)
 	},
 }
+
+var cardLabels []string
+var cardDesc string
 
 type GetListData struct {
 	ID   string `json:"id"`
@@ -31,60 +35,133 @@ type GetListData struct {
 }
 
 func init() {
+	createCardCmd.Flags().StringVarP(&cardDesc, "desc", "d", "", "Provide a description for this card")
+	createCardCmd.Flags().StringSliceVarP(&cardLabels, "labels", "t", nil, "Provide labels for this card (separate with commas)")
 	rootCmd.AddCommand(createCardCmd)
 }
 
-func createCard() {
-	client := trelloClient.NewTrelloClient()
-
-	boardId := os.Getenv("TRELLO_BOARD_ID")
-
-	board, err := client.GetBoard(boardId, trello.Defaults())
+func createCard(name string, list string) {
+	board, err := trelloInstance.GetBoard(trelloClient.GetBoardID())
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
+	if list != "" && name != "" {
+		newCard, err := createCardDirect(board, name, cardDesc, list, cardLabels)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = trelloInstance.CreateCard(newCard, trello.Defaults())
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Success: created %s in list %s\n", newCard.Name, list)
+	} else {
+		selectedList := fetchListByName(board)
+		if selectedList == nil {
+			fmt.Printf("List `%s` could not be found.", list)
+			return
+		}
+
+		newCard, err := createCardObj(board, selectedList)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = trelloInstance.CreateCard(newCard, trello.Defaults())
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("Success: created card `%s` in list `%s`\n", newCard.Name, selectedList.Name)
+	}
+}
+
+func fetchListByName(board *trello.Board) *trello.List {
 	lists, err := board.GetLists(trello.Defaults())
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
 	var getListData []GetListData
 	for _, list := range lists {
 		listData := GetListData{
-			ID:   list.ID,
+			ID: list.ID,
 			Name: list.Name,
 		}
 
 		getListData = append(getListData, listData)
 	}
 
-	selectedListIdx, _, err := promptSelectList(getListData)
+	selectedListId, _, err := promptSelectList(getListData)
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
-	selectedList := lists[selectedListIdx]
-
-	newCard, err := createCardObj(board, selectedList)
-	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
-	}
-
-	err = client.CreateCard(newCard, trello.Defaults())
-	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("Success: created card %s in list %s\n", newCard.Name, selectedList.Name)
+	return lists[selectedListId]
 }
 
-func createCardObj(board *trello.Board, selectedList *trello.List) (*trello.Card, error) {
+func createCardDirect(board *trello.Board, cardTitle, cardDesc, listName string, cardLabels []string) (*trello.Card, error) {
+	cardLabelsInput := []string{}
+
+	if len(cardLabels) > 0 {
+		for _, label := range cardLabels {
+			labels := strings.Split(label, ", ")
+			for _, lbl := range labels {
+				trimmedLabel := strings.TrimSpace(lbl)
+				labelID := getLabelID(board, trimmedLabel)
+				if labelID != "" {
+					cardLabelsInput = append(cardLabelsInput, labelID)
+				}
+			}
+		}
+	}
+
+	selectedList := findListByName(board, listName)
+	if selectedList == nil {
+		return nil, fmt.Errorf("List not found: %s", listName)
+	}
+
+	cardsInList, err := selectedList.GetCards(trello.Defaults())
+	if err != nil {
+		return nil, err
+	}
+
+	var pos float64
+	if len(cardsInList) > 0 {
+		pos = cardsInList[0].Pos + 1.0
+	} else {
+		pos = 1.0
+	}
+
+	newCard := &trello.Card{
+		Name:     cardTitle,
+		Desc:     cardDesc,
+		Pos:      pos,
+		IDList:   selectedList.ID,
+		IDLabels: cardLabelsInput,
+	}
+
+	return newCard, nil
+}
+
+func findListByName(board *trello.Board, listName string) *trello.List {
+	lists, err := board.GetLists(trello.Defaults())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, list := range lists {
+		if list.Name == listName {
+			return list
+		}
+	}
+	return nil
+}
+
+func createCardObj(board *trello.Board, selectedList *trello.List) (*trello.Card, error) {	
 	promptCardName := promptui.Prompt{
 		Label: "Provide a name for this card ",
 	}
@@ -153,7 +230,6 @@ func getLabelID(board *trello.Board, labelName string) string {
 	labels, err := board.GetLabels(trello.Defaults())
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 
 	for _, label := range labels {

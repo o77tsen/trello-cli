@@ -8,13 +8,15 @@ import (
     "github.com/joho/godotenv"
 )
 
-func NewTrelloClient() *trello.Client {
+func init() {
     err := godotenv.Load()
     if err != nil {
         log.Fatal("Error loading env file:", err)
         os.Exit(1)
     }
+}
 
+func NewTrelloClient() *trello.Client {
     appKey := os.Getenv("TRELLO_KEY")
     token := os.Getenv("TRELLO_TOKEN")
 
@@ -22,11 +24,7 @@ func NewTrelloClient() *trello.Client {
     return client
 }
 
-func GetBoard(client *trello.Client, boardID string) (*trello.Board, error) {
-    board, err := client.GetBoard(boardID, trello.Defaults())
-    if err != nil {
-        return nil, err
-    }
-
-    return board, nil
+func GetBoardID() string {
+    boardId := os.Getenv("TRELLO_BOARD_ID")
+    return boardId
 }
