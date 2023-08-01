@@ -27,7 +27,13 @@ go build
 ```
 
 ## configuration
-obtain trello key & token [here](https://developer.atlassian.com/cloud/trello/guides/rest-api/api-introduction/)
+obtain trello key & token [here](https://developer.atlassian.com/cloud/trello/guides/rest-api/api-introduction/) and your board ID, follow these steps:
+1. Go to your Trello board
+2. Copy the shareable link from your browser's address bar
+3. Add `.json` at the end of the link to view all JSON data and copy the `id`
+
+Example: `https://trello.com/b/identifier/your-username.json`
+
 ```
 TRELLO_KEY=
 TRELLO_TOKEN=
